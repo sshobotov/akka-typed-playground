@@ -11,48 +11,57 @@ object UserActivity {
   sealed trait Request
 
   final case class Activate(data: UserRecommendation, client: ActorRef[Response]) extends Request
-  final case class Track(data: VideoActionData, client: ActorRef[Response]) extends Request
+  final case class CheckUp(data: VideoActionData, client: ActorRef[Response]) extends Request
+  final case class Record(data: VideoActionData, client: ActorRef[Response]) extends Request
 
   sealed trait Response
 
   final case object Ok extends Response
-  final case object BadUserId extends Response
-  final case class BadVideoId(current: VideoId) extends Response
+  final case class Failed(reason: ServiceFailure) extends Response
 
   def manager(registered: Map[UserId, VideoActionTracker]): Behavior[Request] =
-    Behaviors.receive { (ctx, request) =>
-      request match {
-        case Activate(data, client) =>
-          val trackerRef = registered.get(data.userId) match {
-            case Some((_, reusable)) => reusable
-            case _                   => ctx.spawn(tracker(data.userId), s"tracker-${data.userId}")
-          }
+    Behaviors.setup { _ =>
+      def recording(data: VideoActionData, client: ActorRef[Response])
+                   (act: ActorRef[VideoActionData] => Unit): Behavior[Request] =
+        registered.get(data.userId) match {
+          case Some((videoId, recorder)) if videoId == data.videoId =>
+            act(recorder)
 
-          client ! Ok
-          manager(registered + (data.userId -> (data.videoId, trackerRef)))
+            client ! Ok
+            Behaviors.same
 
-        case Track(data, client) =>
-          registered.get(data.userId) match {
-            case Some((videoId, tracker)) if videoId == data.videoId =>
-              tracker ! data
+          case Some(_) =>
+            client ! Failed(ServiceFailure.InvalidVideoId)
+            Behaviors.same
 
-              client ! Ok
-              Behaviors.same
+          case _ =>
+            client ! Failed(ServiceFailure.InvalidUserId)
+            Behaviors.same
+        }
 
-            case Some((videoId, _)) =>
-              client ! BadVideoId(videoId)
-              Behaviors.same
+      Behaviors.receive { (ctx, request) =>
+        request match {
+          case Activate(data, client) =>
+            val trackerRef = registered.get(data.userId) match {
+              case Some((_, reusable)) => reusable
+              case _                   => ctx.spawn(recorder(data.userId), s"recorder-${data.userId}")
+            }
 
-            case _ =>
-              client ! BadUserId
-              Behaviors.same
-          }
+            client ! Ok
+            manager(registered + (data.userId -> (data.videoId, trackerRef)))
+
+          case CheckUp(data, client) =>
+            recording(data, client) { _ => /* dry run */ }
+
+          case Record(data, client) =>
+            recording(data, client) { _ ! data }
+        }
       }
     }
 
-  def tracker(userId: UserId): Behavior[VideoActionData] =
+  private def recorder(userId: UserId): Behavior[VideoActionData] =
     Behaviors.receive { case (ctx, target) =>
-      ctx.log.debug(s"Track $target")
+      ctx.log.debug(s"Recording $target")
       Behaviors.same
     }
 }

@@ -12,12 +12,13 @@ object ApplicationService {
   sealed trait Request
 
   final case class Register(data: RegistrationData, client: ActorRef[Response]) extends Request
+  final case class CheckUp(data: VideoActionData, client: ActorRef[Response]) extends Request
   final case class Action(data: VideoActionData, client: ActorRef[Response]) extends Request
 
   sealed trait Response
 
   final case class Ok(offer: UserRecommendation) extends Response
-  final case class Failed(errors: Seq[String]) extends Response
+  final case class Failed(reason: ServiceFailure) extends Response
 
   def main(videos: Seq[Long]): Behavior[Request] = Behaviors.setup { ctx =>
     val userRepository = ctx.spawn(UserRepository.repository(Map.empty, Map.empty), "user-repository")
@@ -31,9 +32,15 @@ object ApplicationService {
           s"register-${data.email}")
         Behaviors.same
 
+      case CheckUp(data, client) =>
+        ctx.spawn(
+          actionRecording(data, checking = true, actionManager, client),
+          s"action-${data.userId}-${data.videoId}")
+        Behaviors.same
+
       case Action(data, client) =>
         ctx.spawn(
-          actionTracking(data, actionManager, client),
+          actionRecording(data, checking = false, actionManager, client),
           s"action-${data.userId}-${data.videoId}")
         Behaviors.same
     }
@@ -68,7 +75,7 @@ object ApplicationService {
                 case Some(offer) => Ok(offer)
                 case _           =>
                   ctx.log.error("Unexpected state: no recommendation while activated tracker")
-                  Failed(Seq.empty)
+                  Failed(ServiceFailure.UnexpectedState)
               }
 
             client ! result
@@ -80,12 +87,17 @@ object ApplicationService {
       }
     }.narrow[NotUsed]
 
-  private def actionTracking(
+  private def actionRecording(
       data: VideoActionData,
+      checking: Boolean,
       actionManager: ActorRef[UserActivity.Request],
       client: ActorRef[Response]): Behavior[UserActivity.Response] =
     Behaviors.setup { ctx =>
-      actionManager ! UserActivity.Track(data, ctx.self)
+      if (checking) {
+        actionManager ! UserActivity.CheckUp(data, ctx.self)
+      } else {
+        actionManager ! UserActivity.Record(data, ctx.self)
+      }
 
       Behaviors.receive { (_, response) =>
         response match {
@@ -93,12 +105,8 @@ object ApplicationService {
             client ! Ok(UserRecommendation(data.userId, data.videoId))
             Behaviors.stopped
 
-          case UserActivity.BadUserId =>
-            client ! Failed(Seq(/*Errors.userNotFound*/))
-            Behaviors.stopped
-
-          case UserActivity.BadVideoId(_) =>
-            client ! Failed(Seq(/*Errors.badVideoId*/))
+          case UserActivity.Failed(reason) =>
+            client ! Failed(reason)
             Behaviors.stopped
         }
       }
