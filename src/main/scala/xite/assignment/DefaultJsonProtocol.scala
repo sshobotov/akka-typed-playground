@@ -11,4 +11,5 @@ trait DefaultJsonProtocol extends ErrorAccumulatingCirceSupport {
   implicit val videoActionDataDecoder: Decoder[VideoActionData] = deriveDecoder
 
   implicit val userRecommendationEncoder: Encoder[UserRecommendation] = deriveEncoder
+  implicit val requestFailureEncoder: Encoder[RequestFailure] = deriveEncoder
 }

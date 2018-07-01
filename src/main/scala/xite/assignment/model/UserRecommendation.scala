@@ -1,3 +1,3 @@
 package xite.assignment.model
 
-case class UserRecommendation(userId: Long, videoId: Long)
+final case class UserRecommendation(userId: Long, videoId: Long)

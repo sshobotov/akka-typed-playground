@@ -2,7 +2,7 @@ package xite.assignment.model
 
 import VideoActionData.Action
 
-case class VideoActionData(userId: Long, videoId: Long, actionId: Action)
+final case class VideoActionData(userId: Long, videoId: Long, actionId: Action)
 
 object VideoActionData {
   type Action = Byte
