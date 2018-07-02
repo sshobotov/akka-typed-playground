@@ -16,6 +16,9 @@ object UserRepository {
   final case class Insert(data: RegistrationData, client: ActorRef[User]) extends Operation
   final case class User(id: UserId)
 
+  /**
+    * Manages user ID's
+    */
   def repository(
       entries: Map[UserId, RegistrationData],
       index:   Map[Email, UserId]): Behavior[Operation] =

@@ -20,10 +20,13 @@ object ApplicationService {
   final case class Ok(offer: UserRecommendation) extends Response
   final case class Failed(reason: ServiceFailure) extends Response
 
+  /**
+    * Serves as gateway for a calls outside of the system
+    */
   def main(videos: Seq[Long]): Behavior[Request] = Behaviors.setup { ctx =>
     val userRepository = ctx.spawn(UserRepository.repository(Map.empty, Map.empty), "user-repository")
     val videoProvider  = ctx.spawn(VideoRecommendation.provider(Queue(videos: _*)), "video-provider")
-    val actionManager  = ctx.spawn(UserActivity.manager(Map.empty), "action-manager")
+    val actionManager  = ctx.spawn(UserActivity.manager(videoProvider), "action-manager")
 
     Behaviors.receiveMessage {
       case Register(data, client) =>
@@ -55,30 +58,14 @@ object ApplicationService {
     Behaviors.setup[AnyRef] { ctx =>
       userRepository ! UserRepository.Insert(data, ctx.self)
 
-      var userRecommendation: Option[UserRecommendation] = None
-
       Behaviors.receive { (ctx, msg) =>
         msg match {
           case UserRepository.User(id) =>
-            videoProvider ! VideoRecommendation.Request(id, ctx.self)
+            actionManager ! UserActivity.Activate(id, ctx.self)
             Behaviors.same
 
-          case VideoRecommendation.Response(offer) =>
-            userRecommendation = Some(offer)
-
-            actionManager ! UserActivity.Activate(offer, ctx.self)
-            Behaviors.same
-
-          case UserActivity.Ok =>
-            val result =
-              userRecommendation match {
-                case Some(offer) => Ok(offer)
-                case _           =>
-                  ctx.log.error("Unexpected state: no recommendation while activated tracker")
-                  Failed(ServiceFailure.UnexpectedState)
-              }
-
-            client ! result
+          case UserActivity.Ok(offer) =>
+            client ! Ok(offer)
             Behaviors.stopped
 
           case _ =>
@@ -96,8 +83,8 @@ object ApplicationService {
 
       Behaviors.receive { (_, msg) =>
         msg match {
-          case UserActivity.Ok =>
-            client ! Ok(UserRecommendation(data.userId, data.videoId))
+          case UserActivity.Ok(offer) =>
+            client ! Ok(offer)
             Behaviors.stopped
 
           case UserActivity.Failed(reason) =>
@@ -113,21 +100,20 @@ object ApplicationService {
       videoProvider: ActorRef[VideoRecommendation.Request],
       client:        ActorRef[Response]): Behavior[NotUsed] =
     Behaviors.setup[AnyRef] { ctx =>
-      actionManager ! UserActivity.Record(data, ctx.self)
+      actionManager ! UserActivity.Track(data, ctx.self)
 
       Behaviors.receive { (_, msg) =>
         msg match {
-          case UserActivity.Ok =>
-            videoProvider ! VideoRecommendation.Request(data.userId, ctx.self)
+          case UserActivity.Ok(offer) =>
+            client ! Ok(offer)
             Behaviors.same
 
           case UserActivity.Failed(reason) =>
             client ! Failed(reason)
             Behaviors.stopped
 
-          case VideoRecommendation.Response(offer) =>
-            client ! Ok(offer)
-            Behaviors.stopped
+          case _ =>
+            Behaviors.unhandled
         }
       }
     }.narrow[NotUsed]

@@ -52,7 +52,7 @@ class ApiRouteSpec extends WordSpec with Matchers with ScalatestRouteTest with B
       }
     }
 
-    "return error if not recent video's ID was used" in {
+    "return error if outdated video ID was used" in {
       val badData = VideoActionData(targetUserId, 4324556L, VideoActionData.Action.Like)
 
       Post("/action", badData) ~> testRoute ~> check {
