@@ -31,47 +31,50 @@ object Api extends DefaultJsonProtocol with CircePimps {
         }
         .result()
 
-    post {
-      path("register") {
-        entity(as[RegistrationData]) { data =>
-          validated(Validation.registrationRules)(data) {
-            val result: Future[ApplicationService.Response] =
-              system ? (ref => ApplicationService.Register(data, ref))
-
-            onServiceResponse(system.log.error(_, "Register request is failed"))(result) {
-              case Right(offer) => complete(offer)
-              case Left(reason) =>
-                complete(StatusCodes.BadRequest, RequestFailure(NonEmptyList.of(reason)))
-            }
-          }
-        }
-      } ~
-      path("action") {
-        entity(as[VideoActionData]) { data =>
-          val onResponse =
-            onServiceResponse(system.log.error(_, "Action request is failed")) _
-
-          val checkUp: Future[ApplicationService.Response] =
-            system ? (ref => ApplicationService.CheckUp(data, ref))
-
-          onResponse(checkUp) { result =>
-            val rules: VideoActionData => ValidatedNel[String, Unit] =
-              Validation.videoActionRules(_, result.left.toOption)
-
-            validated(rules)(data) {
+    val route =
+      post {
+        path("register") {
+          entity(as[RegistrationData]) { data =>
+            validated(Validation.registrationRules)(data) {
               val result: Future[ApplicationService.Response] =
-                system ? (ref => ApplicationService.Action(data, ref))
+                system ? (ref => ApplicationService.Register(data, ref))
 
-              onResponse(result) {
+              onServiceResponse(system.log.error(_, "Register request is failed"))(result) {
                 case Right(offer) => complete(offer)
                 case Left(reason) =>
                   complete(StatusCodes.BadRequest, RequestFailure(NonEmptyList.of(reason)))
               }
             }
           }
+        } ~
+        path("action") {
+          entity(as[VideoActionData]) { data =>
+            val onResponse =
+              onServiceResponse(system.log.error(_, "Action request is failed")) _
+
+            val checkUp: Future[ApplicationService.Response] =
+              system ? (ref => ApplicationService.CheckUp(data, ref))
+
+            onResponse(checkUp) { result =>
+              val rules: VideoActionData => ValidatedNel[String, Unit] =
+                Validation.videoActionRules(_, result.left.toOption)
+
+              validated(rules)(data) {
+                val result: Future[ApplicationService.Response] =
+                  system ? (ref => ApplicationService.Action(data, ref))
+
+                onResponse(result) {
+                  case Right(offer) => complete(offer)
+                  case Left(reason) =>
+                    complete(StatusCodes.BadRequest, RequestFailure(NonEmptyList.of(reason)))
+                }
+              }
+            }
+          }
         }
       }
-    }
+
+    Route.seal(route)
   }
 
   private def validated[T, E](check: T => ValidatedNel[String, Unit])(entry: T): Directive0 =
@@ -138,7 +141,7 @@ object Api extends DefaultJsonProtocol with CircePimps {
       cond(RegistrationData.Gender.values contains entry.gender,  Errors.invalidGender)
 
     def videoActionRules(entry: VideoActionData, error: Option[String]): ValidatedNel[String, Unit] =
-      cond(error.nonEmpty,                                        error.get) combine
+      cond(error.isEmpty,                                         error.get) combine
       cond(VideoActionData.Action.values contains entry.actionId, Errors.invalidAction)
   }
 

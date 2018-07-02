@@ -34,13 +34,13 @@ object ApplicationService {
 
       case CheckUp(data, client) =>
         ctx.spawn(
-          actionRecording(data, checking = true, actionManager, client),
-          s"action-${data.userId}-${data.videoId}")
+          actionChecking(data, actionManager, client),
+          s"checkup-${data.userId}-${data.videoId}")
         Behaviors.same
 
       case Action(data, client) =>
         ctx.spawn(
-          actionRecording(data, checking = false, actionManager, client),
+          actionRecording(data, actionManager, videoProvider, client),
           s"action-${data.userId}-${data.videoId}")
         Behaviors.same
     }
@@ -87,20 +87,15 @@ object ApplicationService {
       }
     }.narrow[NotUsed]
 
-  private def actionRecording(
-      data: VideoActionData,
-      checking: Boolean,
+  private def actionChecking(
+      data:          VideoActionData,
       actionManager: ActorRef[UserActivity.Request],
-      client: ActorRef[Response]): Behavior[UserActivity.Response] =
+      client:        ActorRef[Response]): Behavior[UserActivity.Response] =
     Behaviors.setup { ctx =>
-      if (checking) {
-        actionManager ! UserActivity.CheckUp(data, ctx.self)
-      } else {
-        actionManager ! UserActivity.Record(data, ctx.self)
-      }
+      actionManager ! UserActivity.CheckUp(data, ctx.self)
 
-      Behaviors.receive { (_, response) =>
-        response match {
+      Behaviors.receive { (_, msg) =>
+        msg match {
           case UserActivity.Ok =>
             client ! Ok(UserRecommendation(data.userId, data.videoId))
             Behaviors.stopped
@@ -111,4 +106,29 @@ object ApplicationService {
         }
       }
     }
+
+  private def actionRecording(
+      data:          VideoActionData,
+      actionManager: ActorRef[UserActivity.Request],
+      videoProvider: ActorRef[VideoRecommendation.Request],
+      client:        ActorRef[Response]): Behavior[NotUsed] =
+    Behaviors.setup[AnyRef] { ctx =>
+      actionManager ! UserActivity.Record(data, ctx.self)
+
+      Behaviors.receive { (_, msg) =>
+        msg match {
+          case UserActivity.Ok =>
+            videoProvider ! VideoRecommendation.Request(data.userId, ctx.self)
+            Behaviors.same
+
+          case UserActivity.Failed(reason) =>
+            client ! Failed(reason)
+            Behaviors.stopped
+
+          case VideoRecommendation.Response(offer) =>
+            client ! Ok(offer)
+            Behaviors.stopped
+        }
+      }
+    }.narrow[NotUsed]
 }
