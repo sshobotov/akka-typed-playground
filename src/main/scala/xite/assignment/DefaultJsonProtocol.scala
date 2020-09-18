@@ -1,10 +1,10 @@
-package xite.assignment
+package sshobotov.akka
 
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport
 import io.circe.{Decoder, Encoder}
 import io.circe.generic.semiauto._
 
-import xite.assignment.model._
+import sshobotov.akka.model._
 
 trait DefaultJsonProtocol extends ErrorAccumulatingCirceSupport {
   implicit val userRecommendationDecoder: Decoder[UserRecommendation] = deriveDecoder

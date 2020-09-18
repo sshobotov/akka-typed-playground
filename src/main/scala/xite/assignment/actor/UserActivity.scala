@@ -1,9 +1,9 @@
-package xite.assignment.actor
+package sshobotov.akka.actor
 
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
 
-import xite.assignment.model._
+import sshobotov.akka.model._
 
 object UserActivity {
   type VideoActionTracker = (VideoId, ActorRef[VideoActionData])

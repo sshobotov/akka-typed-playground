@@ -1,4 +1,4 @@
-package xite.assignment.model
+package sshobotov.akka.model
 
 import VideoActionData.Action
 

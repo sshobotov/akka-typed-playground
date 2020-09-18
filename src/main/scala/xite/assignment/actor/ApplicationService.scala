@@ -1,10 +1,10 @@
-package xite.assignment.actor
+package sshobotov.akka.actor
 
 import akka.NotUsed
 import akka.actor.typed.{ActorRef, Behavior}
 import akka.actor.typed.scaladsl.Behaviors
 
-import xite.assignment.model._
+import sshobotov.akka.model._
 
 import scala.collection.immutable.Queue
 

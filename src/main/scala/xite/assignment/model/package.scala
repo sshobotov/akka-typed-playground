@@ -1,4 +1,4 @@
-package xite.assignment
+package sshobotov.akka
 
 package object model {
   type UserId  = Long

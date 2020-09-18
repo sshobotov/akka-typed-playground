@@ -1,4 +1,4 @@
-package xite.assignment
+package sshobotov.akka
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.AskPattern._
@@ -11,8 +11,8 @@ import cats.data._
 import cats.implicits._
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport.DecodingFailures
 
-import xite.assignment.actor.ApplicationService
-import xite.assignment.model._
+import sshobotov.akka.actor.ApplicationService
+import sshobotov.akka.model._
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}

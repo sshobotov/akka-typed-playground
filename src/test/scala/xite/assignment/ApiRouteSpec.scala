@@ -1,4 +1,4 @@
-package xite.assignment
+package sshobotov.akka
 
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 import akka.actor.typed.ActorSystem

@@ -1,4 +1,4 @@
-package xite.assignment
+package sshobotov.akka
 
 import io.circe.{CursorOp, DecodingFailure}
 

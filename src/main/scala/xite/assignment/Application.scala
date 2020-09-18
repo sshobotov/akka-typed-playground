@@ -1,4 +1,4 @@
-package xite.assignment
+package sshobotov.akka
 
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.adapter._
@@ -6,7 +6,7 @@ import akka.http.scaladsl.Http
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 
-import xite.assignment.actor.ApplicationService
+import sshobotov.akka.actor.ApplicationService
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -32,5 +32,7 @@ object Application extends DefaultJsonProtocol with CircePimps {
       }
 
     Await.result(system.whenTerminated, Duration.Inf)
+      .failure
+      .fold(())(throw _)
   }
 }
