@@ -1,6 +1,6 @@
 name := "Test assignment"
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.12"
 
 Compile / run / mainClass := Some("xite.assignment.Application")
 
